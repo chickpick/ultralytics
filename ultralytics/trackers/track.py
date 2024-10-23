@@ -86,16 +86,15 @@ def on_predict_postprocess_end(predictor: object, persist: bool = False) -> None
         det_chick_track = det[mask_chick]  # Detections for chicks
         det_wings = det[mask_wing]          # Detections for wings
 
+        tracks = tracker.update(det_chick_track.cpu().numpy(), im0s[i])  # Update tracker
+
         # Debugging prints for shapes and contents
         # print(f"Class 1 Wings (shape: {det_wings.shape}):\n{det_wings}\n")
         # print(f"Class 0 Chicks to send to tracking (shape: {det_chick_track.shape}):\n{det_chick_track}\n")
 
-        # Update the tracker with chick detections
-        if len(det_chick_track) > 0:
-            tracks = tracker.update(det_chick_track.cpu().numpy(), im0s[i])  # Update tracker
-        else:
-            tracks = np.empty((0, det_chick_track.shape[1]))  # No chicks detected, create an empty array
-
+        if len(tracks) == 0:
+            continue
+        
         # Debugging print for tracking results
         # print(f"Chick after Tracking shape: {tracks.shape}\nOutput of Tracking: {tracks}\n")
 
