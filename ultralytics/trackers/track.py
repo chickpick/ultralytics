@@ -15,7 +15,7 @@ from .byte_tracker import BYTETracker
 TRACKER_MAP = {"bytetrack": BYTETracker, "botsort": BOTSORT}
 
 
-def on_predict_start(predictor: object, persist: bool = False) -> None:
+def on_predict_start_OLD(predictor: object, persist: bool = False) -> None:
     """
     Initialize trackers for object tracking during prediction.
 
@@ -49,6 +49,42 @@ def on_predict_start(predictor: object, persist: bool = False) -> None:
     predictor.trackers = trackers
     predictor.vid_path = [None] * predictor.dataset.bs  # for determining when to reset tracker on new video
 
+
+def on_predict_start(predictor: object, persist: bool = False) -> None:
+    """
+    Initialize trackers for object tracking during prediction.
+
+    Args:
+        predictor (object): The predictor object to initialize trackers for.
+        persist (bool): Whether to persist the trackers if they already exist.
+
+    Raises:
+        AssertionError: If the tracker_type is not 'bytetrack' or 'botsort'.
+
+    Examples:
+        Initialize trackers for a predictor object:
+        >>> predictor = SomePredictorClass()
+        >>> on_predict_start(predictor, persist=True)
+    """
+    if hasattr(predictor, "trackers") and persist:
+        return
+
+    tracker = check_yaml(predictor.args.tracker)
+    cfg = IterableSimpleNamespace(**yaml_load(tracker))
+
+    if cfg.tracker_type not in {"bytetrack", "botsort"}:
+        raise AssertionError(f"Only 'bytetrack' and 'botsort' are supported for now, but got '{cfg.tracker_type}'")
+
+    trackers = []
+    # Change this to initialize 4 trackers
+    for _ in range(4):  # Instead of using predictor.dataset.bs
+        tracker = TRACKER_MAP[cfg.tracker_type](args=cfg, frame_rate=30)
+        trackers.append(tracker)
+
+    # Set the trackers and video paths
+    predictor.trackers = trackers
+    predictor.vid_path = [None] * 4  # Adjusted to match the number of trackers
+
 def on_predict_postprocess_end(predictor: object, persist: bool = False) -> None:
     """
     Postprocess detected boxes and update with object tracking.
@@ -59,10 +95,14 @@ def on_predict_postprocess_end(predictor: object, persist: bool = False) -> None
     
     is_obb = predictor.args.task == "obb"  # Check if the task is oriented bounding boxes (OBBs)
     is_stream = predictor.dataset.mode == "stream"  # Check if the dataset is in streaming mode
-    
+
+    trackers = [predictor.trackers[cam_idx] for cam_idx in range(4)]  # One tracker per camera
+
     for i in range(len(im0s)):
+        # Get the tracker corresponding to the current camera
+        tracker = trackers[i]
         # Get the tracker for the current image
-        tracker = predictor.trackers[i if is_stream else 0]
+        #tracker = predictor.trackers[i if is_stream else 0]
         vid_path = predictor.save_dir / Path(path[i]).name  # Define the video path for saving results
         
         # Reset the tracker if the video path has changed
@@ -126,7 +166,7 @@ def on_predict_postprocess_end(predictor: object, persist: bool = False) -> None
         update_args = {"obb" if is_obb else "boxes": combined_detections}
         predictor.results[i].update(**update_args)
 
-def on_predict_postprocess_endOld(predictor: object, persist: bool = False) -> None:
+def on_predict_postprocess_end_old(predictor: object, persist: bool = False) -> None:
     """
     Postprocess detected boxes and update with object tracking.
 
